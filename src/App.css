@@ -1,0 +1,50 @@
+.btn-primary,
+.btn-secondary,
+.btn-light {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: 18px;
+  padding: 0.85rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.btn-primary {
+  border: 0;
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(74, 144, 164, 0.24);
+}
+
+.btn-secondary {
+  border: 1px solid rgba(47, 58, 60, 0.12);
+  background: #fff;
+  color: var(--color-heading);
+}
+
+.btn-light {
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  background: #fff;
+  color: var(--color-primary);
+}
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-light:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 36px rgba(47, 58, 60, 0.12);
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+.btn-light:active {
+  transform: translateY(0);
+}

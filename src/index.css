@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --color-primary: #4a90a4;
+  --color-secondary: #8fb996;
+  --color-accent: #6faf9f;
+  --color-background: #f8faf8;
+  --color-surface: #eef2f1;
+  --color-heading: #2f3a3c;
+  --color-text: #2f3a3c;
+  --color-muted: #66757a;
+  --color-low: #6baf92;
+  --color-medium: #e8b95b;
+  --color-high: #d97b6c;
+  font-family: 'Poppins', system-ui, sans-serif;
+  color: var(--color-text);
+  background: var(--color-background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(111, 175, 159, 0.15), transparent 30rem),
+    var(--color-background);
+}
+
+button,
+a,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(74, 144, 164, 0.35);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: rgba(74, 144, 164, 0.2);
+}
