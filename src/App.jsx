@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -16,10 +16,11 @@ import {
   Waves,
   X,
 } from 'lucide-react'
+import { fetchPredictions, savePrediction, uploadAudio } from './services/emotionAPI'
 import './App.css'
 
 const API_URL = 'https://spindle-party-treachery.ngrok-free.dev/predict'
-const GITHUB_URL = 'https://github.com/'
+const GITHUB_URL = 'https://github.com/filbert6431/Emotional_Fatigue_AwanDeka/'
 
 const navItems = [
   { id: 'home', label: 'Home' },
@@ -31,6 +32,17 @@ const stats = [
   { label: 'Total Data Analyzed', value: '1,248', detail: 'Audio samples processed' },
   { label: 'Prediction Summary', value: '3 Levels', detail: 'Low, medium, and high fatigue' },
   { label: 'Total Prediction', value: '928', detail: 'Demonstration predictions' },
+]
+
+const defaultPredictionCounts = { low: 0, medium: 0, high: 0 }
+
+const defaultMonthlyUploads = [
+  { label: 'Jan', value: 0 },
+  { label: 'Feb', value: 0 },
+  { label: 'Mar', value: 0 },
+  { label: 'Apr', value: 0 },
+  { label: 'May', value: 0 },
+  { label: 'Jun', value: 0 },
 ]
 
 const technologies = [
@@ -51,10 +63,20 @@ const workflow = [
 ]
 
 const team = [
-  { name: 'Awan', role: 'Machine Learning Developer', initials: 'AW' },
-  { name: 'Deka', role: 'Frontend Developer', initials: 'DK' },
-  { name: 'Research Team', role: 'Data Mining Project', initials: 'RT' },
+  {
+    name: 'Filbert Anggriawan',
+    role: 'Machine Learning Developer',
+    initials: 'FA',
+    imageSrc: '/Images/Filbert Angg.jpeg',
+  },
+  {
+    name: 'Alya Deka Danisha',
+    role: 'Machine Learning Developer',
+    initials: 'DK',
+    imageSrc: '/Images/Alya.jpeg',
+  },
 ]
+
 
 const fatigueDetails = {
   low: {
@@ -100,6 +122,43 @@ function normalizeConfidence(data) {
 
   if (!Number.isFinite(numeric)) return null
   return numeric <= 1 ? Math.round(numeric * 100) : Math.round(numeric)
+}
+
+function getPredictionCounts(predictions) {
+  return predictions.reduce(
+    (summary, prediction) => {
+      const level = String(prediction.emotional_fatigue_level || '').toLowerCase()
+
+      if (level.includes('low')) summary.low += 1
+      if (level.includes('medium')) summary.medium += 1
+      if (level.includes('high')) summary.high += 1
+
+      return summary
+    },
+    { ...defaultPredictionCounts },
+  )
+}
+
+function getMonthlyUploads(predictions) {
+  const groupedUploads = predictions.reduce((months, prediction) => {
+    const createdAt = new Date(prediction.created_at)
+
+    if (Number.isNaN(createdAt.getTime())) return months
+
+    const monthKey = `${createdAt.getFullYear()}-${createdAt.getMonth()}`
+    const label = createdAt.toLocaleString('en-US', { month: 'short' })
+    const currentMonth = months.get(monthKey) || { label, value: 0, date: createdAt }
+
+    currentMonth.value += 1
+    months.set(monthKey, currentMonth)
+
+    return months
+  }, new Map())
+
+  return Array.from(groupedUploads.values())
+    .sort((first, second) => first.date - second.date)
+    .slice(-6)
+    .map(({ label, value }) => ({ label, value }))
 }
 
 function App() {
@@ -204,6 +263,39 @@ function App() {
 }
 
 function HomePage({ onStart }) {
+  const [displayStats, setDisplayStats] = useState(stats)
+  const [predictionCounts, setPredictionCounts] = useState(defaultPredictionCounts)
+  const [monthlyUploads, setMonthlyUploads] = useState(defaultMonthlyUploads)
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const predictions = await fetchPredictions()
+        const total = predictions.length
+        const counts = getPredictionCounts(predictions)
+        const uploadsByMonth = getMonthlyUploads(predictions)
+
+        setDisplayStats([
+          { label: 'Total Data Analyzed', value: total.toLocaleString(), detail: 'Audio samples processed' },
+          {
+            label: 'Prediction Summary',
+            value: `${counts.low}/${counts.medium}/${counts.high}`,
+            detail: 'Low / Medium / High fatigue',
+          },
+          { label: 'Total Prediction', value: total.toLocaleString(), detail: 'Stored prediction records' },
+        ])
+        setPredictionCounts(counts)
+        setMonthlyUploads(uploadsByMonth.length > 0 ? uploadsByMonth : defaultMonthlyUploads)
+      } catch {
+        setDisplayStats(stats)
+        setPredictionCounts(defaultPredictionCounts)
+        setMonthlyUploads(defaultMonthlyUploads)
+      }
+    }
+
+    loadStats()
+  }, [])
+
   return (
     <>
       <section className="relative overflow-hidden">
@@ -299,15 +391,19 @@ function HomePage({ onStart }) {
             text="Temporary demonstration data is shown here and can be connected to real usage metrics later."
           />
           <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {stats.map((stat) => (
+            {displayStats.map((stat) => (
               <article key={stat.label} className="rounded-[20px] bg-white p-6 shadow-sm">
                 <BarChart3 className="mb-5 text-[var(--color-primary)]" size={26} aria-hidden="true" />
                 <p className="text-sm font-semibold text-[var(--color-muted)]">{stat.label}</p>
                 <p className="mt-3 text-3xl font-semibold text-[var(--color-heading)]">{stat.value}</p>
                 <p className="mt-2 text-sm text-[var(--color-muted)]">{stat.detail}</p>
+                {stat.label === 'Prediction Summary' && (
+                  <PredictionDonutChart counts={predictionCounts} />
+                )}
               </article>
             ))}
           </div>
+          <MonthlyUploadChart uploads={monthlyUploads} />
         </div>
       </section>
 
@@ -395,13 +491,24 @@ function AboutPage() {
         <div className="mt-6 grid gap-5 md:grid-cols-3">
           {team.map((member) => (
             <article key={member.name} className="rounded-[20px] bg-white p-6 shadow-sm">
-              <div className="grid h-20 w-20 place-items-center rounded-[20px] bg-[var(--color-surface)] text-xl font-semibold text-[var(--color-primary)]">
-                {member.initials}
+              <div className="grid h-20 w-20 overflow-hidden rounded-[20px] bg-[var(--color-surface)]">
+                {member.imageSrc ? (
+                  <img
+                    src={member.imageSrc}
+                    alt={member.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="place-items-center text-xl font-semibold text-[var(--color-primary)]">
+                    {member.initials}
+                  </div>
+                )}
               </div>
               <h3 className="mt-5 text-xl font-semibold text-[var(--color-heading)]">{member.name}</h3>
               <p className="mt-2 text-sm font-medium text-[var(--color-muted)]">{member.role}</p>
             </article>
           ))}
+
         </div>
       </section>
     </section>
@@ -422,10 +529,7 @@ function FatigueTestPage() {
 
     if (!selectedFile) return
 
-    const isWav =
-      selectedFile.name.toLowerCase().endsWith('.wav') ||
-      selectedFile.type === 'audio/wav' ||
-      selectedFile.type === 'audio/x-wav'
+    const isWav = selectedFile.name.toLowerCase().endsWith('.wav')
 
     if (!isWav) {
       setFile(null)
@@ -447,6 +551,7 @@ function FatigueTestPage() {
     setResult(null)
 
     try {
+      const audioFile = await uploadAudio(file)
       const formData = new FormData()
       formData.append('file', file)
 
@@ -462,6 +567,10 @@ function FatigueTestPage() {
       }
 
       const key = normalizePrediction(data)
+      const fatigueLevel = fatigueDetails[key].title
+
+      await savePrediction(audioFile, fatigueLevel)
+
       setResult({
         ...fatigueDetails[key],
         confidence: normalizeConfidence(data),
@@ -598,6 +707,111 @@ function SectionIntro({ eyebrow, title, text }) {
       </h2>
       <p className="mt-4 leading-8 text-[var(--color-muted)]">{text}</p>
     </div>
+  )
+}
+
+function PredictionDonutChart({ counts }) {
+  const segments = [
+    { label: 'Low', value: counts.low, color: 'var(--color-low)' },
+    { label: 'Medium', value: counts.medium, color: 'var(--color-medium)' },
+    { label: 'High', value: counts.high, color: 'var(--color-high)' },
+  ]
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0)
+  let offset = 0
+
+  return (
+    <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-center">
+      <div className="relative h-32 w-32 shrink-0">
+        <svg viewBox="0 0 120 120" role="img" aria-label="Prediction summary donut chart">
+          <circle
+            cx="60"
+            cy="60"
+            r="42"
+            fill="none"
+            stroke="var(--color-surface)"
+            strokeWidth="18"
+          />
+          {segments.map((segment) => {
+            const dashLength = total > 0 ? (segment.value / total) * 263.89 : 0
+            const circle = (
+              <circle
+                key={segment.label}
+                cx="60"
+                cy="60"
+                r="42"
+                fill="none"
+                stroke={segment.color}
+                strokeDasharray={`${dashLength} 263.89`}
+                strokeDashoffset={-offset}
+                strokeLinecap="round"
+                strokeWidth="18"
+                transform="rotate(-90 60 60)"
+              />
+            )
+
+            offset += dashLength
+            return circle
+          })}
+        </svg>
+        <div className="absolute inset-0 grid place-items-center text-center">
+          <span className="text-2xl font-semibold text-[var(--color-heading)]">{total}</span>
+        </div>
+      </div>
+
+      <div className="grid flex-1 gap-2">
+        {segments.map((segment) => (
+          <div key={segment.label} className="flex items-center justify-between gap-3 text-sm">
+            <span className="flex items-center gap-2 font-medium text-[var(--color-muted)]">
+              <span
+                className="h-3 w-3 rounded-full"
+                style={{ backgroundColor: segment.color }}
+              />
+              {segment.label}
+            </span>
+            <span className="font-semibold text-[var(--color-heading)]">{segment.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MonthlyUploadChart({ uploads }) {
+  const highestValue = Math.max(...uploads.map((upload) => upload.value), 1)
+
+  return (
+    <article className="mt-4 rounded-[20px] bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-muted)]">Monthly Uploads</p>
+          <h3 className="mt-2 text-2xl font-semibold text-[var(--color-heading)]">
+            Uploaded audio per month
+          </h3>
+        </div>
+        <BarChart3 className="text-[var(--color-primary)]" size={28} aria-hidden="true" />
+      </div>
+
+      <div className="mt-8 flex h-60 items-end gap-3 rounded-[20px] bg-[var(--color-background)] p-5">
+        {uploads.map((upload) => {
+          const height = upload.value > 0 ? Math.max((upload.value / highestValue) * 100, 10) : 4
+
+          return (
+            <div key={upload.label} className="flex h-full flex-1 flex-col items-center justify-end gap-3">
+              <span className="text-sm font-semibold text-[var(--color-heading)]">
+                {upload.value}
+              </span>
+              <div
+                className="w-full max-w-16 rounded-t-2xl bg-[var(--color-primary)] transition"
+                style={{ height: `${height}%` }}
+                aria-label={`${upload.value} uploads in ${upload.label}`}
+                role="img"
+              />
+              <span className="text-xs font-semibold text-[var(--color-muted)]">{upload.label}</span>
+            </div>
+          )
+        })}
+      </div>
+    </article>
   )
 }
 
