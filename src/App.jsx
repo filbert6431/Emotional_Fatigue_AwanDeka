@@ -106,12 +106,31 @@ const fatigueDetails = {
 }
 
 function normalizePrediction(data) {
-  const rawLabel = data?.label ?? data?.prediction ?? data?.class ?? data?.result
-  const label = String(rawLabel ?? '').toLowerCase()
+  // Try common textual label fields first
+  const rawLabelField = data?.predicted_class_label ?? data?.predicted_label ?? data?.prediction ?? data?.label ?? data?.result ?? ''
+  let classLabel = String(rawLabelField ?? '').toLowerCase()
 
-  if (label.includes('low') || rawLabel === 0 || rawLabel === 1 || label === '1') return 'low'
-  if (label.includes('medium') || rawLabel === 2 || label === '2') return 'medium'
-  if (label.includes('high') || rawLabel === 3 || label === '3') return 'high'
+  // Try numeric index fields
+  const classIndex = data?.predicted_class_index ?? data?.predicted_index ?? data?.class_index ?? data?.class ?? null
+
+  // If backend provided the classes/labels array, map index through it
+  const classesArray = data?.classes ?? data?.labels ?? data?.class_labels
+  if (Array.isArray(classesArray) && classIndex != null && classesArray[classIndex]) {
+    classLabel = String(classesArray[classIndex]).toLowerCase()
+  }
+
+  // Normalize textual label
+  if (classLabel.includes('low')) return 'low'
+  if (classLabel.includes('medium')) return 'medium'
+  if (classLabel.includes('high')) return 'high'
+
+  // Fallback numeric mapping (default convention)
+  if (classIndex != null && Number.isFinite(Number(classIndex))) {
+    const idx = Number(classIndex)
+    if (idx === 0) return 'low'
+    if (idx === 1) return 'medium'
+    if (idx === 2) return 'high'
+  }
 
   return 'medium'
 }
@@ -192,11 +211,9 @@ function App() {
             </span>
             <span>
               <span className="block text-base font-semibold text-[var(--color-heading)]">
-                FatigueSense
+                Fatigue Sense AwanDeka
               </span>
-              <span className="block text-xs font-medium text-[var(--color-muted)]">
-                Human Fatigue Detection
-              </span>
+              <span className="block text-xs font-medium text-[var(--color-muted)]">Fatigue Detection System</span>
             </span>
           </button>
 
@@ -254,7 +271,7 @@ function App() {
 
       <footer className="border-t border-black/5 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 text-sm text-[var(--color-muted)] sm:flex-row sm:items-center sm:justify-between lg:px-8">
-          <p>Human Fatigue Detection Web Application</p>
+          <p>Fatigue Sense AwanDeka Web Application</p>
           <p>Research demonstration powered by CNN audio classification.</p>
         </div>
       </footer>
@@ -306,7 +323,7 @@ function HomePage({ onStart }) {
               Voice-based fatigue screening
             </span>
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight text-[var(--color-heading)] sm:text-5xl lg:text-6xl">
-              Human Fatigue Detection
+              Fatigue Sense AwanDeka
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-[var(--color-muted)]">
               A calm web application for classifying fatigue levels from WAV audio using a
@@ -429,7 +446,7 @@ function AboutPage() {
       <SectionIntro
         eyebrow="About"
         title="From voice recording to fatigue prediction."
-        text="This page explains the system workflow, research stack, and team behind the Human Fatigue Detection application."
+        text="This page explains the system workflow, research stack, and team behind the Fatigue Sense AwanDeka application."
       />
 
       <div className="mt-10 grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
@@ -437,7 +454,7 @@ function AboutPage() {
           <Activity className="mb-5 text-[var(--color-primary)]" size={30} aria-hidden="true" />
           <h2 className="text-2xl font-semibold text-[var(--color-heading)]">Project Overview</h2>
           <p className="mt-4 leading-8 text-[var(--color-muted)]">
-            Human Fatigue Detection uses audio processing and deep learning to classify fatigue
+            Fatigue Sense AwanDeka uses audio processing and deep learning to classify fatigue
             into low, medium, and high levels. The website presents the research and provides a
             direct interface for testing WAV audio through the available backend API.
           </p>
@@ -457,6 +474,17 @@ function AboutPage() {
             ))}
           </div>
         </article>
+      </div>
+
+      <div className="mt-5 rounded-[20px] bg-white p-7 shadow-sm">
+        <h2 className="text-2xl font-semibold text-[var(--color-heading)]">Process Flowchart</h2>
+        <div className="mt-6 flex justify-center">
+          <img 
+            src="/Images/FlowChart.png" 
+            alt="System Workflow Flowchart" 
+            className="max-w-full h-auto rounded-lg"
+          />
+        </div>
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -560,7 +588,17 @@ function FatigueTestPage() {
         body: formData,
       })
 
-      const data = await response.json()
+      // Safely parse response: backend may return HTML on errors (500)
+      const contentType = response.headers.get('content-type') || ''
+      let data
+
+      if (contentType.includes('application/json')) {
+        data = await response.json()
+      } else {
+        const text = await response.text()
+        // Throw with the raw response text so the UI can show server traceback/html
+        throw new Error(`Server returned non-JSON response (status ${response.status}): ${text}`)
+      }
 
       if (!response.ok || data?.success === false) {
         throw new Error(data?.message || 'The audio file could not be processed.')
@@ -666,7 +704,7 @@ function FatigueTestPage() {
 
         <aside className="rounded-[20px] bg-white p-6 shadow-sm">
           <h2 className="text-2xl font-semibold text-[var(--color-heading)]">Prediction Result</h2>
-          {!result ? (
+            {!result ? (
             <div className="mt-6 rounded-[20px] bg-[var(--color-background)] p-6">
               <p className="text-[var(--color-muted)]">
                 Your fatigue prediction will appear here after the WAV file is processed.
@@ -689,6 +727,10 @@ function FatigueTestPage() {
               <div className="mt-5 space-y-4">
                 <InfoBlock title="Description" text={result.description} />
                 <InfoBlock title="Recommendation" text={result.recommendation} />
+              </div>
+              <div className="mt-4 rounded-[10px] bg-[var(--color-background)] p-3 text-xs">
+                <strong className="block mb-2">Raw API response (debug):</strong>
+                <pre className="whitespace-pre-wrap break-words">{JSON.stringify(result.raw, null, 2)}</pre>
               </div>
             </div>
           )}
